@@ -82,9 +82,21 @@ private:
     Node* find_node_by_code(int code) const {
         if (!head) return nullptr;
         if (code <= head->bound) return head;
-        Node* cur = head->next;
-        while (cur != head && cur->bound < code) cur = cur->next;
-        return cur;
+        Node* cur = head;
+        if (fast_search_list_size <= 0 || list_size <= 1) {
+            Node* lin = head->next;
+            while (lin != head && lin->bound < code) lin = lin->next;
+            return lin;
+        }
+        for (int k = fast_search_list_size - 1; k >= 0; --k) {
+            Node* nxt = cur->fast_search_list[k];
+            if (!nxt) continue;
+            // Allow jump only if it does not wrap (monotonic bound)
+            if (nxt->bound >= cur->bound && nxt->bound < code) {
+                cur = nxt;
+            }
+        }
+        return cur->next; // first node with bound >= code
     }
 
 public:
