@@ -88,12 +88,18 @@ private:
             while (lin != head && lin->bound < code) lin = lin->next;
             return lin;
         }
-        for (int k = fast_search_list_size - 1; k >= 0; --k) {
-            Node* nxt = cur->fast_search_list[k];
-            if (!nxt) continue;
-            // Allow jump only if it does not wrap (monotonic bound)
-            if (nxt->bound >= cur->bound && nxt->bound < code) {
-                cur = nxt;
+        bool moved = true;
+        while (moved) {
+            moved = false;
+            for (int k = fast_search_list_size - 1; k >= 0; --k) {
+                Node* nxt = cur->fast_search_list[k];
+                if (!nxt) continue;
+                // Allow jump only if it does not wrap (monotonic bound) and stays before target
+                if (nxt->bound >= cur->bound && nxt->bound < code) {
+                    cur = nxt;
+                    moved = true;
+                    break; // restart from the largest jump at new position
+                }
             }
         }
         return cur->next; // first node with bound >= code
