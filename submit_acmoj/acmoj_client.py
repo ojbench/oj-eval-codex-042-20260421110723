@@ -91,6 +91,14 @@ class ACMOJClient:
 
         return result
 
+    def submit_code(self, problem_id: int, language: str, code_text: str) -> Optional[Dict]:
+        """Submit raw source code text for problems that compile user code with a harness."""
+        data = {"language": language, "code": code_text}
+        result = self._make_request("POST", f"/problem/{problem_id}/submit", data=data)
+        if result and 'id' in result:
+            self._save_submission_id(result['id'])
+        return result
+
     def get_submission_detail(self, submission_id: int) -> Optional[Dict]:
         return self._make_request("GET", f"/submission/{submission_id}")
 
@@ -130,17 +138,33 @@ def main():
     client = ACMOJClient(args.token)
 
     if args.command == "submit":
-        try:
-            with open(args.code_file, 'r', encoding='utf-8') as f:
-                code_text = f.read()
-        except FileNotFoundError:
-            print(f"Error: Code file not found at {args.code_file}")
-            exit(1)
-        except Exception as e:
-            print(f"Error: Failed to read code file: {e}")
-            exit(1)
+        # Special handling for git submissions: treat code_file as a URL if provided
+        if args.language.lower() == "git":
+            git_url = None
+            # If code_file looks like a URL, use it directly; otherwise try to read from git remote
+            if args.code_file.startswith("http://") or args.code_file.startswith("https://") or args.code_file.startswith("git@"):
+                git_url = args.code_file
+            else:
+                # Fallback: attempt to get origin URL
+                try:
+                    import subprocess
+                    git_url = subprocess.check_output(["git", "remote", "get-url", "origin"], text=True).strip()
+                except Exception:
+                    print("Error: Provide a git URL via --code-file for git submissions, or run in a git repo with an origin remote.")
+                    exit(1)
+            result = client.submit_git(args.problem_id, git_url)
+        else:
+            try:
+                with open(args.code_file, 'r', encoding='utf-8') as f:
+                    code_text = f.read()
+            except FileNotFoundError:
+                print(f"Error: Code file not found at {args.code_file}")
+                exit(1)
+            except Exception as e:
+                print(f"Error: Failed to read code file: {e}")
+                exit(1)
 
-        result = client.submit_code(args.problem_id, args.language, code_text)
+            result = client.submit_code(args.problem_id, args.language, code_text)
 
     elif args.command == "status":
         result = client.get_submission_detail(args.submission_id)
